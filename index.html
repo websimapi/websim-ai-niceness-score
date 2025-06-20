@@ -200,6 +200,13 @@
         <h1>AI Niceness Score</h1>
         <p class="subtitle">How nice are you when talking to AI? Let's find out!</p>
         
+        <div style="margin: 20px 0;">
+            <label style="display: flex; align-items: center; justify-content: center; gap: 10px; color: #666; cursor: pointer;">
+                <input type="checkbox" id="deepSearch" style="transform: scale(1.2);">
+                <span>Deep Search (analyze ALL projects - may take longer)</span>
+            </label>
+        </div>
+        
         <button class="analyze-btn" onclick="analyzeNiceness()">Analyze My Prompts</button>
         
         <div class="loading" id="loading">
@@ -295,8 +302,10 @@
             const projects = [];
             let hasMore = true;
             let after = null;
+            const isDeepSearch = document.getElementById('deepSearch').checked;
+            const maxProjects = isDeepSearch ? Infinity : 200;
             
-            while (hasMore && projects.length < 200) { // Limit to prevent infinite loops
+            while (hasMore && projects.length < maxProjects) {
                 const response = await fetch(`/api/v1/users/${currentUser.username}/projects?first=100${after ? `&after=${after}` : ''}`);
                 const data = await response.json();
                 
@@ -305,7 +314,15 @@
                 hasMore = data.projects.meta.has_next_page;
                 after = data.projects.meta.end_cursor;
                 
-                updateStatus(`Fetched ${projects.length} projects...`, 10 + (projects.length / 200) * 20);
+                const progressPercent = isDeepSearch ? 
+                    Math.min(10 + (projects.length / 50) * 20, 30) : // For deep search, slower progress
+                    10 + (projects.length / 200) * 20;
+                updateStatus(`Fetched ${projects.length} projects...`, progressPercent);
+                
+                // Add a small delay for deep search to prevent rate limiting
+                if (isDeepSearch && projects.length % 200 === 0) {
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
             }
             
             return projects;
@@ -337,7 +354,9 @@
         }
 
         async function analyzePromptsWithAI(prompts) {
-            const combinedPrompts = prompts.slice(0, 100).join('\n---\n'); // Limit to prevent token limits
+            const isDeepSearch = document.getElementById('deepSearch').checked;
+            const promptsToAnalyze = isDeepSearch ? prompts.slice(0, 500) : prompts.slice(0, 100); // More prompts for deep search
+            const combinedPrompts = promptsToAnalyze.join('\n---\n');
             
             const analysisPrompt = `
                 Analyze the following prompts that a user wrote to AI systems. 
@@ -347,6 +366,8 @@
                 - Constructive tone
                 - Clarity and helpfulness
                 - Patience and understanding
+                
+                ${isDeepSearch ? 'This is a comprehensive analysis of their full prompt history.' : 'This is a sample of their recent prompts.'}
                 
                 Prompts to analyze:
                 ${combinedPrompts}
@@ -412,4 +433,3 @@
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>
-
