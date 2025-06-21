@@ -578,7 +578,7 @@
 
         window.addEventListener('DOMContentLoaded', () => {
             // Subscribe to gallery updates
-            room.collection('niceness_score_v1').subscribe(scores => {
+            room.collection('niceness_score_v2').subscribe(scores => {
                 allScores = scores;
                 renderGallery();
             });
@@ -642,9 +642,9 @@
                 </div>
                 
                 <div>
-                    <h4 style="text-align: left; color: #333; margin-bottom: 10px;">AI's Analysis Snippet:</h4>
-                    <p style="text-align: left; background: white; padding: 15px; border-radius: 8px; border: 1px solid #eee; line-height: 1.6; color: #555;">
-                        ${scoreItem.analysis_snippet || 'No analysis snippet available.'}
+                    <h4 style="text-align: left; color: #333; margin-bottom: 10px;">AI's Full Analysis:</h4>
+                    <p style="text-align: left; background: white; padding: 15px; border-radius: 8px; border: 1px solid #eee; line-height: 1.6; color: #555; max-height: 200px; overflow-y: auto;">
+                        ${scoreItem.analysis || scoreItem.analysis_snippet || 'No analysis available.'}
                     </p>
                 </div>
             `;
@@ -971,11 +971,11 @@ Do not wrap your response in quotes or add any extra commentary. Just provide th
             postButton.textContent = 'Posting...';
 
             try {
-                await room.collection('niceness_score_v1').create({
+                await room.collection('niceness_score_v2').create({
                     score: lastAnalysisResult.score,
                     is_deep_search: lastAnalysisResult.isDeepSearch,
-                    // Storing a snippet of the analysis for context
-                    analysis_snippet: lastAnalysisResult.analysis.substring(0, 250) 
+                    // Storing the full analysis, not just a snippet
+                    analysis: lastAnalysisResult.analysis 
                 });
                 postButton.textContent = 'Posted!';
                 setTimeout(() => {
@@ -1038,8 +1038,8 @@ Do not wrap your response in quotes or add any extra commentary. Just provide th
                         <div class="score-info">
                             <div class="gallery-score" style="color: ${scoreColor};">${item.score}</div>
                             ${item.is_deep_search 
-                                ? `<div class="search-type-badge deep-search">Deep Search</div>` 
-                                : `<div class="search-type-badge">Recent</div>`
+                                ? `<div class="search-type-badge deep-search" style="padding: 8px 16px; font-size: 1em;">Deep Search</div>` 
+                                : `<div class="search-type-badge" style="padding: 8px 16px; font-size: 1em;">Recent</div>`
                             }
                         </div>
                     </div>

@@ -1,0 +1,28 @@
+{
+  "database": {
+    "schema": {
+      "niceness_score_v2": {
+        "id": {
+          "type": "uuid",
+          "primaryKey": true
+        },
+        "user_id": {
+            "type": "uuid"
+        },
+        "score": {
+          "type": "integer"
+        },
+        "is_deep_search": {
+          "type": "boolean"
+        },
+        "analysis": {
+          "type": "text"
+        },
+        "created_at": {
+            "type": "timestamptz"
+        }
+      }
+    }
+  }
+}
+
