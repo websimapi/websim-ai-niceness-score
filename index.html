@@ -342,7 +342,7 @@
                         success = true;
 
                         const progressPercent = isDeepSearch ? 
-                            Math.min(10 + (projects.length / 50) * 20, 30) : 
+                            Math.min(10 + (projects.length / 500) * 20, 30) : // Adjusted for a more representative deep search progress
                             10 + (projects.length / Math.min(projects.length, 200)) * 20;
                         updateStatus(`Fetched ${projects.length} projects...`, progressPercent);
 
@@ -353,7 +353,11 @@
                     } catch (error) {
                         attempt++;
                         if (attempt >= MAX_RETRIES) {
-                            throw new Error(`Failed to fetch projects after ${MAX_RETRIES} attempts. Last error: ${error.message}`);
+                             console.warn(`Failed to fetch projects after ${MAX_RETRIES} attempts. Proceeding with ${projects.length} projects. Last error: ${error.message}`);
+                            updateStatus(`Couldn't fetch all projects due to an error. Analyzing ${projects.length} projects found so far...`, document.getElementById('progressBar').style.width.replace('%',''));
+                            hasMore = false;
+                            await new Promise(resolve => setTimeout(resolve, 1500)); // Give user time to read status
+                            break; // exit retry loop
                         }
                         const backoff = Math.pow(2, attempt) * 500; // Exponential backoff
                         updateStatus(`Fetch failed. Retrying in ${backoff / 1000}s... (Attempt ${attempt}/${MAX_RETRIES})`, document.getElementById('progressBar').style.width.replace('%',''));
