@@ -260,6 +260,7 @@
             loading.classList.add('show');
             scoreDisplay.classList.remove('show');
             analysisDetails.classList.remove('show');
+            updateStatus('Starting analysis...', 0);
             
             try {
                 // Get current user
@@ -272,6 +273,16 @@
                 
                 // Fetch user's projects
                 const projects = await fetchAllProjects();
+                
+                if (projects.length === 0) {
+                    updateStatus('No projects found to analyze.', 100);
+                     setTimeout(() => {
+                        loading.classList.remove('show');
+                        btn.disabled = false;
+                    }, 2000);
+                    return;
+                }
+
                 updateStatus(`Found ${projects.length} projects. Analyzing prompts...`, 30);
                 
                 // Extract all prompts from projects
@@ -294,7 +305,7 @@
                 setTimeout(() => {
                     loading.classList.remove('show');
                     btn.disabled = false;
-                }, 2000);
+                }, 3000);
             }
         }
 
@@ -304,24 +315,50 @@
             let after = null;
             const isDeepSearch = document.getElementById('deepSearch').checked;
             const maxProjects = isDeepSearch ? Infinity : 200;
-            
+            const MAX_RETRIES = 5;
+
             while (hasMore && projects.length < maxProjects) {
-                const response = await fetch(`/api/v1/users/${currentUser.username}/projects?first=100${after ? `&after=${after}` : ''}`);
-                const data = await response.json();
-                
-                projects.push(...data.projects.data.map(item => item.project));
-                
-                hasMore = data.projects.meta.has_next_page;
-                after = data.projects.meta.end_cursor;
-                
-                const progressPercent = isDeepSearch ? 
-                    Math.min(10 + (projects.length / 50) * 20, 30) : // For deep search, slower progress
-                    10 + (projects.length / 200) * 20;
-                updateStatus(`Fetched ${projects.length} projects...`, progressPercent);
-                
-                // Add a small delay for deep search to prevent rate limiting
-                if (isDeepSearch && projects.length % 200 === 0) {
-                    await new Promise(resolve => setTimeout(resolve, 500));
+                let attempt = 0;
+                let success = false;
+                while (attempt < MAX_RETRIES && !success) {
+                    try {
+                        const url = `/api/v1/users/${currentUser.username}/projects?first=100${after ? `&after=${after}` : ''}`;
+                        const response = await fetch(url);
+
+                        if (!response.ok) {
+                            throw new Error(`Server responded with ${response.status}`);
+                        }
+
+                        const data = await response.json();
+
+                        if (!data || !data.projects || !data.projects.data || !data.projects.meta) {
+                            throw new Error('Invalid data structure from API.');
+                        }
+
+                        projects.push(...data.projects.data.map(item => item.project).filter(Boolean));
+                        
+                        hasMore = data.projects.meta.has_next_page;
+                        after = data.projects.meta.end_cursor;
+                        success = true;
+
+                        const progressPercent = isDeepSearch ? 
+                            Math.min(10 + (projects.length / 50) * 20, 30) : 
+                            10 + (projects.length / Math.min(projects.length, 200)) * 20;
+                        updateStatus(`Fetched ${projects.length} projects...`, progressPercent);
+
+                        if (isDeepSearch) {
+                            await new Promise(resolve => setTimeout(resolve, 250));
+                        }
+
+                    } catch (error) {
+                        attempt++;
+                        if (attempt >= MAX_RETRIES) {
+                            throw new Error(`Failed to fetch projects after ${MAX_RETRIES} attempts. Last error: ${error.message}`);
+                        }
+                        const backoff = Math.pow(2, attempt) * 500; // Exponential backoff
+                        updateStatus(`Fetch failed. Retrying in ${backoff / 1000}s... (Attempt ${attempt}/${MAX_RETRIES})`, document.getElementById('progressBar').style.width.replace('%',''));
+                        await new Promise(resolve => setTimeout(resolve, backoff));
+                    }
                 }
             }
             
