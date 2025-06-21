@@ -96,6 +96,25 @@
             transform: none;
         }
 
+        .generator-btn {
+            background: linear-gradient(135deg, #feca57, #ff6b6b);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 50px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            margin-left: 15px;
+        }
+
+        .generator-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+        }
+
         .loading {
             display: none;
             margin: 20px 0;
@@ -269,6 +288,105 @@
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
 
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.5);
+            backdrop-filter: blur(5px);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: auto;
+            padding: 30px;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 600px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+            position: relative;
+            text-align: center;
+        }
+        
+        .modal-content h2 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+        
+        .modal-content p {
+            margin-bottom: 20px;
+            color: #666;
+        }
+        
+        #userInputPrompt {
+            width: 100%;
+            height: 100px;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+            font-size: 1em;
+            margin-bottom: 20px;
+            resize: vertical;
+        }
+        
+        #generatePolitePromptBtn, #copyPromptBtn {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 50px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        #generatePolitePromptBtn:disabled {
+             opacity: 0.6;
+             cursor: not-allowed;
+        }
+        
+        #politePromptOutput {
+            margin-top: 20px;
+            text-align: left;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+        }
+
+        #generatedPromptText {
+             white-space: pre-wrap;
+             word-wrap: break-word;
+             background: white;
+             padding: 15px;
+             border-radius: 5px;
+             border: 1px solid #eee;
+             max-height: 200px;
+             overflow-y: auto;
+        }
+
+        .close-btn {
+            color: #aaa;
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close-btn:hover,
+        .close-btn:focus {
+            color: black;
+        }
+
         #sort-control {
             padding: 8px 12px;
             border-radius: 8px;
@@ -364,6 +482,7 @@
         </div>
         
         <button class="analyze-btn" onclick="analyzeNiceness()">Analyze My Prompts</button>
+        <button class="generator-btn" onclick="openGenerator()">Generate a Nice Prompt</button>
         
         <div class="loading" id="loading">
             <div class="spinner"></div>
@@ -423,6 +542,25 @@
         </div>
     </div>
 
+    <div id="promptGeneratorModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeGenerator()">&times;</span>
+            <h2>Niceness Prompt Generator</h2>
+            <p>Enter your prompt below, and our AI will help you make it more polite and effective!</p>
+            <textarea id="userInputPrompt" placeholder="e.g., 'give me code for a snake game'"></textarea>
+            <button id="generatePolitePromptBtn" onclick="generatePolitePrompt()">✨ Generate Polite Prompt</button>
+            <div class="loading" id="generatorLoading" style="display: none;">
+                <div class="spinner"></div>
+                <div class="status-text">Generating...</div>
+            </div>
+            <div id="politePromptOutput" style="display: none;">
+                <h4 style="margin-bottom:10px;">Generated Prompt:</h4>
+                <pre id="generatedPromptText"></pre>
+                <button id="copyPromptBtn" onclick="copyPrompt()" style="margin-top:15px;">Copy Prompt</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const room = new WebsimSocket();
         let currentUser = null;
@@ -452,6 +590,89 @@
                 renderGallery();
             });
         });
+
+        function openGenerator() {
+            const modal = document.getElementById('promptGeneratorModal');
+            modal.style.display = 'flex';
+        }
+
+        function closeGenerator() {
+            const modal = document.getElementById('promptGeneratorModal');
+            modal.style.display = 'none';
+        }
+        
+        window.onclick = function(event) {
+            const modal = document.getElementById('promptGeneratorModal');
+            if (event.target == modal) {
+                closeGenerator();
+            }
+        }
+        
+        async function generatePolitePrompt() {
+            const userInput = document.getElementById('userInputPrompt').value;
+            if (!userInput.trim()) {
+                alert('Please enter a prompt to transform.');
+                return;
+            }
+
+            const generateBtn = document.getElementById('generatePolitePromptBtn');
+            const loading = document.getElementById('generatorLoading');
+            const outputDiv = document.getElementById('politePromptOutput');
+            const outputText = document.getElementById('generatedPromptText');
+
+            generateBtn.disabled = true;
+            generateBtn.style.display = 'none';
+            loading.style.display = 'block';
+            outputDiv.style.display = 'none';
+
+            const systemPrompt = `You are a prompt engineering assistant. Your task is to rewrite a user's prompt to be more polite, collaborative, and effective for an AI model. Follow these guidelines to improve the prompt:
+
+**Key Principles:**
+- **Politeness:** Use words like "please," "thank you," and "could you."
+- **Collaboration:** Frame requests as a partnership, e.g., "Let's work together on..." or "I appreciate your help."
+- **Clarity and Context:** Encourage the user to provide context. For example, suggest adding phrases like "Explain it to me like I'm [a beginner/an expert]" or "Assume I know X, but not Y."
+- **Encourage Detail:** Use phrases like "Feel free to elaborate on..." or "Take your time and go step-by-step."
+- **Open-ended Questions:** Use "What would you suggest if...?" to foster creative solutions.
+- **Positive Reinforcement:** Incorporate phrases like "You're doing great so far; let's refine this part..." when applicable for follow-up prompts.
+
+**Your Goal:**
+Take the user's raw prompt and transform it into a well-structured, polite, and detailed request that is more likely to yield a high-quality response from an AI.
+Do not wrap your response in quotes or add any extra commentary. Just provide the rewritten prompt directly.`;
+            
+            try {
+                const completion = await websim.chat.completions.create({
+                    messages: [
+                        { role: "system", content: systemPrompt },
+                        { role: "user", content: `Rewrite this prompt: "${userInput}"` }
+                    ]
+                });
+                
+                outputText.textContent = completion.content;
+                outputDiv.style.display = 'block';
+            } catch (error) {
+                console.error("Error generating polite prompt:", error);
+                outputText.textContent = "Sorry, I couldn't generate a prompt right now. Please try again.";
+                outputDiv.style.display = 'block';
+            } finally {
+                loading.style.display = 'none';
+                generateBtn.style.display = 'block';
+                generateBtn.disabled = false;
+            }
+        }
+
+        function copyPrompt() {
+            const textToCopy = document.getElementById('generatedPromptText').textContent;
+            const copyBtn = document.getElementById('copyPromptBtn');
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                copyBtn.textContent = 'Copied!';
+                setTimeout(() => {
+                    copyBtn.textContent = 'Copy Prompt';
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy text: ', err);
+                alert('Failed to copy text.');
+            });
+        }
 
         async function analyzeNiceness() {
             const btn = document.querySelector('.analyze-btn');
