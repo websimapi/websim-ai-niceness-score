@@ -235,6 +235,48 @@
             text-align: center;
         }
 
+        .gallery-filters {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .tabs {
+            display: flex;
+            background-color: #e2e8f0;
+            border-radius: 50px;
+            padding: 5px;
+        }
+
+        .tab-btn {
+            border: none;
+            background: transparent;
+            padding: 8px 20px;
+            border-radius: 50px;
+            font-size: 0.9em;
+            font-weight: 600;
+            cursor: pointer;
+            color: #4a5568;
+            transition: all 0.3s ease;
+        }
+        
+        .tab-btn.active {
+            background: white;
+            color: #667eea;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        #sort-control {
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            background-color: white;
+            font-size: 0.9em;
+        }
+
         .gallery {
             display: grid;
             grid-template-columns: 1fr;
@@ -364,6 +406,17 @@
 
         <div class="gallery-container" id="galleryContainer">
             <h2>Niceness Gallery</h2>
+            <div class="gallery-filters">
+                <div class="tabs">
+                    <button class="tab-btn active" data-tab="all">All Scores</button>
+                    <button class="tab-btn" data-tab="recent">Recent</button>
+                    <button class="tab-btn" data-tab="deep">Deep Search</button>
+                </div>
+                <select id="sort-control">
+                    <option value="highest">Sort by Highest</option>
+                    <option value="newest">Sort by Newest</option>
+                </select>
+            </div>
             <div class="gallery" id="gallery">
                 <p style="color: #666; text-align: center;">Loading scores...</p>
             </div>
@@ -374,10 +427,30 @@
         const room = new WebsimSocket();
         let currentUser = null;
         let lastAnalysisResult = null;
+        let allScores = [];
+        let currentFilter = 'all';
+        let currentSort = 'highest';
 
         window.addEventListener('DOMContentLoaded', () => {
             // Subscribe to gallery updates
-            room.collection('niceness_score_v1').subscribe(renderGallery);
+            room.collection('niceness_score_v1').subscribe(scores => {
+                allScores = scores;
+                renderGallery();
+            });
+
+            document.querySelector('.tabs').addEventListener('click', e => {
+                if (e.target.classList.contains('tab-btn')) {
+                    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+                    e.target.classList.add('active');
+                    currentFilter = e.target.dataset.tab;
+                    renderGallery();
+                }
+            });
+
+            document.getElementById('sort-control').addEventListener('change', e => {
+                currentSort = e.target.value;
+                renderGallery();
+            });
         });
 
         async function analyzeNiceness() {
@@ -635,15 +708,38 @@
             }
         }
 
-        function renderGallery(scores) {
+        function renderGallery() {
             const galleryEl = document.getElementById('gallery');
-            if (!scores || scores.length === 0) {
-                galleryEl.innerHTML = '<p style="color: #666; text-align: center;">Be the first to post your score!</p>';
+
+            let scoresToRender = [...allScores];
+
+            // 1. Filter
+            if (currentFilter === 'recent') {
+                scoresToRender = scoresToRender.filter(s => !s.is_deep_search);
+            } else if (currentFilter === 'deep') {
+                scoresToRender = scoresToRender.filter(s => s.is_deep_search);
+            }
+            
+            // 2. Sort
+            if (currentSort === 'highest') {
+                scoresToRender.sort((a, b) => (b.score || 0) - (a.score || 0));
+            } else { // 'newest'
+                // The default order from subscribe is already newest first.
+                // We just need to ensure it's stable if it was resorted.
+                scoresToRender.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            }
+
+
+            if (scoresToRender.length === 0) {
+                let message = 'No scores to display for this filter.';
+                if (currentFilter === 'all' && allScores.length === 0) {
+                     message = 'Be the first to post your score!';
+                }
+                galleryEl.innerHTML = `<p style="color: #666; text-align: center;">${message}</p>`;
                 return;
             }
             
-            // The getList() is already sorted newest to oldest.
-            galleryEl.innerHTML = scores.map(item => {
+            galleryEl.innerHTML = scoresToRender.map(item => {
                 if (!item.username || typeof item.score === 'undefined') {
                     return ''; // Skip rendering malformed records
                 }
